@@ -65,4 +65,4 @@ if __name__ == "__main__":
     #parser.add_argument("--port", default=5000, type=int, help="port number")
     #model = torch.hub.load('ultralytics/yolov5','yolov5s')
     #model = torch.hub.load('ikouhaha/pet_face_yolov5','custom', path='best.pt', force_reload=True)  # force_reload to recache
-    app.run(debug=True, host='0.0.0.0')  # debug=True causes Restarting with stat
+    app.run(host='0.0.0.0',port=5000)  # debug=True causes Restarting with stat
