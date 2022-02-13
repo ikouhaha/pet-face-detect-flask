@@ -2,11 +2,15 @@ import cv2
 from PIL import Image
 import base64
 import io
-from urllib.parse import urlparse
 
-def getServerUrl(url):
-  urlInfo = urlparse(url)
-  return urlInfo.scheme+"://"+urlInfo.netloc
+def getServerUrl(host):
+  schema = ""
+  if "localhost" in host:
+    schema ="http"
+  else:
+    schema ="https"
+  
+  return schema+"://"+host
 
 def getFileSize(byte,type="MB"):
   if type=="MB":

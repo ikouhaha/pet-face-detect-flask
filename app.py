@@ -38,6 +38,40 @@ def createJsonResponse(code,result):
      response.headers["Content-Type"] = 'application/json'
      return response
 
+def detectImageResult(rImage,img_size):
+    data = {}
+    image_file = rImage
+    image_bytes = image_file.read()
+    image = np.asarray(bytearray(image_bytes), dtype="uint8")
+    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+    ori_img = image.copy()
+    new_im,ratio,top,left = Util.resize_img(image,img_size) #resize to 224x224
+    results = model(new_im,size=img_size) 
+    
+    results.render() 
+
+    if(len(results.pandas().xyxy)==0):
+        raise Exception('cant detect')
+    if(len(results.pandas().xyxy[0])==0):
+        raise Exception('cant detect')
+    if(len(results.pandas().xyxy[0])>1):
+        raise Exception('cant detect more than 1 object per image')
+
+
+    for xyxy in results.pandas().xyxy:
+        xyJson = json.loads(xyxy.to_json(orient="records"))
+        data["xyxy"] = xyJson[0]
+    #only 1 image
+    for img in results.imgs:
+        xmin,xmax,ymin,ymax = Util.readOriginalBB(data["xyxy"],ratio,top,left)
+        img_str = Util.getBase64FromImage(img)
+        data["labelImg"] = img_str 
+        crop = ori_img[ymin:ymax, xmin:xmax]     
+        crop_img_str = Util.getBase64FromImage(crop)
+        data["cropImg"] = crop_img_str 
+    return data    
+
+
 
 
 
@@ -48,7 +82,7 @@ def hello():
 
 @app.route("/test")
 def test():
-    serverUrl = Util.getServerUrl(request.url)
+    serverUrl = Util.getServerUrl(request.environ["HTTP_HOST"])
     return render_template("test.html",serverUrl=serverUrl)
 
 # @app.route("/detect", methods=["POST"])
@@ -82,12 +116,15 @@ def test():
 def upload_file():
       result = detectBase64()
       j = result.json
-      jr = j["result"]
+      jrs = j["result"]
+      errMsg = ""
       if(j["success"]==False):
-          return 'file upload failed ' + jr
+          for jr in jrs:
+              errMsg+=jr
+          return 'file upload failed ' + errMsg
       #f.save(secure_filename(f.filename))
     
-      return render_template("result.html",result=jr)
+      return render_template("result.html",results=jrs)
 
 #only support 1 image 1 face 
 @app.route("/detectBase64", methods=["POST"])
@@ -113,52 +150,15 @@ def detectBase64():
             response = createJsonResponse(500,"the size of files is too big ({:.5f}MB)".format(file_size))
             return 
             
-
-        if request.files.get("image"):
-            
-            image_file = request.files["image"]
-            image_bytes = image_file.read()
-            image = np.asarray(bytearray(image_bytes), dtype="uint8")
-            image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-            ori_img = image.copy()
-            new_im,ratio,top,left = Util.resize_img(image,img_size) #resize to 224x224
-            cv2.imwrite("test.jpg", new_im) #test
-            new_im_copy = new_im.copy()
-            #annotator = Annotator(cvImg, line_width=3, example=str("cat"))
-            #img = Image.open(io.BytesIO(image_bytes))
-            results = model(new_im,size=img_size) 
-            #resultJson = json.loads(results.pandas().xyxy[0].to_json(orient="records"))
-            results.render() 
-
-            if(len(results.pandas().xyxy)==0):
-                response = createJsonResponse(500,"cant detect")
-                return
-            if(len(results.pandas().xyxy[0])==0):
-                response = createJsonResponse(500,"cant detect")
-                return
-            if(len(results.pandas().xyxy[0])>1):
-                response = createJsonResponse(500,"cant detect more than 1")
-                return
-
-            for xyxy in results.pandas().xyxy:
-                xyJson = json.loads(xyxy.to_json(orient="records"))
-                data["xyxy"] = xyJson[0]
-            #only 1 image
-            for img in results.imgs:
-                xmin,xmax,ymin,ymax = Util.readOriginalBB(data["xyxy"],ratio,top,left)
-                img_str = Util.getBase64FromImage(img)
-                data["labelImg"] = img_str 
-                crop = ori_img[ymin:ymax, xmin:xmax]     
-                crop_img_str = Util.getBase64FromImage(crop)
-                data["cropImg"] = crop_img_str 
-
-                ####test area
-                
-                ####test area
+        if(request.files["image"]):
+            dataList = []
+            for requestFile in request.files.getlist("image"):
+                data = detectImageResult(requestFile,img_size)
+                dataList.append(data)
 
             #im0 = annotator.result()
             
-            response = createJsonResponse(200,data)
+            response = createJsonResponse(200,dataList)
         else:
             response = createJsonResponse(500,"no image")
             

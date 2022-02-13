@@ -1,12 +1,23 @@
 <html>
    <body>
       <h1>Label Image</h1>
-      <img src=data:image/png;base64,{{result.labelImg}}>
+      <div id="labelContainer">
+         {% for result in results %}
+         <img width="224"  src=data:image/png;base64,{{result.labelImg}}>
+         {% endfor %}
+      </div>
       <h1>Cropped Image</h1>
-      <img src=data:image/png;base64,{{result.cropImg}}>
-<value is too large to edit>
+      <div id="CropContainer">
+         {% for result in results %}
+         <img width="224"  src=data:image/png;base64,{{result.cropImg}}>
+         {% endfor %}
+      </div>
+
       <h1>Result</h1>
-      {{result.xyxy}}
+      {% for result in results %}
+         <div>{{result.xyxy}}</div>
+      {% endfor %}
+      
 
    </body>
 </html>
