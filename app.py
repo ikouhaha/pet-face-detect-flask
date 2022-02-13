@@ -84,7 +84,7 @@ def upload_file():
       j = result.json
       jr = j["result"]
       if(j["success"]==False):
-          return 'file upload failed' + jr
+          return 'file upload failed ' + jr
       #f.save(secure_filename(f.filename))
     
       return render_template("result.html",result=jr)
@@ -96,6 +96,7 @@ def detectBase64():
     response = None
     data = {}
     img_size = 224 #resize to 224x224
+    file_size = 0
     
     try:
         if(model is None):
@@ -104,7 +105,14 @@ def detectBase64():
             
         model.eval()
         if not request.method == "POST":
-            return
+            response = createJsonResponse(500,"only support POST method")
+            return 
+
+        file_size = Util.getFileSize(request.content_length,"MB")
+        if(file_size) > 5 :
+            response = createJsonResponse(500,"the size of files is too big ({:.5f}MB)".format(file_size))
+            return 
+            
 
         if request.files.get("image"):
             

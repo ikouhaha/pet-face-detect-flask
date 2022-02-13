@@ -8,6 +8,13 @@ def getServerUrl(url):
   urlInfo = urlparse(url)
   return urlInfo.scheme+"://"+urlInfo.netloc
 
+def getFileSize(byte,type="MB"):
+  if type=="MB":
+    return byte/1024/1024
+  if type=="KB":
+    return byte/1024
+
+
 def resize_img(im,img_size):
   old_size = im.shape[:2] # old_size is in (height, width) format
   ratio = float(img_size) / max(old_size)

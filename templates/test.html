@@ -2,8 +2,10 @@
    <body>
       <form action = "{{serverUrl}}/uploader" method = "POST" 
          enctype = "multipart/form-data">
-         <input type = "file" name = "image" />
+         <input type = "file" name = "image"  accept="image/*">
          <input type = "submit"/>
+         <br/>
+         <span> Max size: 5MB</span>
       </form>   
    </body>
 </html>
