@@ -9,7 +9,9 @@
       <h1>Cropped Image</h1>
       <div id="CropContainer">
          {% for result in results %}
-         <img width="224"  src=data:image/png;base64,{{result.cropImg}}>
+            {% for img in result.cropImgs %}
+               <img width="80"  src=data:image/png;base64,{{img}}>
+            {% endfor %}
          {% endfor %}
       </div>
 

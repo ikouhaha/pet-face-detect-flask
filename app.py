@@ -45,7 +45,7 @@ def detectImageResult(rImage,img_size):
     image = np.asarray(bytearray(image_bytes), dtype="uint8")
     image = cv2.imdecode(image, cv2.IMREAD_COLOR)
     ori_img = image.copy()
-    new_im,ratio,top,left = Util.resize_img(image,img_size) #resize to 224x224
+    new_im,ratio,top,left = Util.resize_img(image,224) #resize to 224x224
     results = model(new_im,size=img_size) 
     
     results.render() 
@@ -54,21 +54,32 @@ def detectImageResult(rImage,img_size):
         raise Exception('cant detect')
     if(len(results.pandas().xyxy[0])==0):
         raise Exception('cant detect')
-    if(len(results.pandas().xyxy[0])>1):
-        raise Exception('cant detect more than 1 object per image')
+    #if(len(results.pandas().xyxy[0])>1):
+    #    raise Exception('cant detect more than 1 object per image')
 
-
+    cropList = []
+    cropStrList = []
     for xyxy in results.pandas().xyxy:
         xyJson = json.loads(xyxy.to_json(orient="records"))
-        data["xyxy"] = xyJson[0]
+        data["xyxy"] = xyJson
     #only 1 image
     for img in results.imgs:
-        xmin,xmax,ymin,ymax = Util.readOriginalBB(data["xyxy"],ratio,top,left)
+        for xyxy in data["xyxy"]:
+            xmin,xmax,ymin,ymax = Util.readOriginalBB(xyxy,ratio,top,left)
+            crop = ori_img[ymin:ymax, xmin:xmax]  
+            cropList.append(crop)
+    
+    for crop in cropList:
+        resizeCrop,ratio,top,left = Util.resize_img(crop,80)
+        img_str = Util.getBase64FromImage(resizeCrop)
+        cropStrList.append(img_str)
+
+
         img_str = Util.getBase64FromImage(img)
         data["labelImg"] = img_str 
-        crop = ori_img[ymin:ymax, xmin:xmax]     
-        crop_img_str = Util.getBase64FromImage(crop)
-        data["cropImg"] = crop_img_str 
+        
+        data["cropImgs"] = cropStrList 
+        
     return data    
 
 
