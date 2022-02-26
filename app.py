@@ -4,15 +4,17 @@ Run a rest API exposing the yolov5s object detection model
 
 
 
+from http.client import HTTPResponse
 import cv2
 import torch
-from flask import Flask, request, make_response,render_template
+from flask import Flask, request, make_response,render_template, send_file
 from PIL import Image
 import json
 import io
 import numpy as np
+import urllib3
 import Util
-
+import zipfile
 
 
 global model 
@@ -38,6 +40,7 @@ def createJsonResponse(code,result):
      response.headers["Content-Type"] = 'application/json'
      return response
 
+
 def detectImageResult(rImage,img_size):
     data = {}
     image_file = rImage
@@ -59,26 +62,31 @@ def detectImageResult(rImage,img_size):
 
     cropList = []
     cropStrList = []
+    name = ""
     for xyxy in results.pandas().xyxy:
         xyJson = json.loads(xyxy.to_json(orient="records"))
-        data["xyxy"] = xyJson
+        data["xyxys"] = xyJson
+       
     #only 1 image
     for img in results.imgs:
-        for xyxy in data["xyxy"]:
+        for xyxy in data["xyxys"]:
             xmin,xmax,ymin,ymax = Util.readOriginalBB(xyxy,ratio,top,left)
+            name = xyxy["name"]
             crop = ori_img[ymin:ymax, xmin:xmax]  
             cropList.append(crop)
     
     for crop in cropList:
         resizeCrop,ratio,top,left = Util.resize_img(crop,80)
-        img_str = Util.getBase64FromImage(resizeCrop)
+        img_str = Util.encodeBase64FromImage(resizeCrop)
         cropStrList.append(img_str)
 
 
-        img_str = Util.getBase64FromImage(img)
-        data["labelImg"] = img_str 
+    img_str = Util.encodeBase64FromImage(img)
+
+    data["name"] = name
+    data["labelImg"] = img_str  
+    data["cropImgs"] = cropStrList 
         
-        data["cropImgs"] = cropStrList 
         
     return data    
 
@@ -123,8 +131,36 @@ def test():
 #     finally:
 #        return response
 
+@app.route('/download', methods = ['POST'])
+def downloadFile ():
+    #For windows you need to use drive name [ex: F:/Example.pdf]
+    requestList = request.form["results"]
+    requestList = json.loads(requestList.replace('\'',"\""))
+    
+    imgList = []
+    i = 0
+    zip_buffer = io.BytesIO()
+    zf = zipfile.ZipFile(zip_buffer, mode="w",compression=zipfile.ZIP_DEFLATED)
+    for r in requestList:
+          name = r["name"]
+          for base64img in r["cropImgs"]:
+             imgName = name + str(i+1)+".jpg"
+             img =  Util.decodeBase64ToImage(base64img)
+             #for file_name, data in [('1.txt', io.BytesIO(b'111')), ('2.txt', io.BytesIO(b'222'))]:
+             zf.writestr(imgName, img)
+             i = i+1
+    zf.close()
+    zip_buffer.seek(0)
+    
+    response = make_response(zip_buffer.read())
+    response.headers.set('Content-Type', 'zip')
+    response.headers.set('Content-Disposition', 'attachment', filename='download.zip' )
+    return response        
+    #return send_file(zip, as_attachment=True)
+
 @app.route('/uploader', methods = ['GET', 'POST'])
 def upload_file():
+      serverUrl = Util.getServerUrl(request.environ["HTTP_HOST"])
       result = detectBase64()
       j = result.json
       jrs = j["result"]
@@ -135,7 +171,7 @@ def upload_file():
           return 'file upload failed ' + errMsg
       #f.save(secure_filename(f.filename))
     
-      return render_template("result.html",results=jrs)
+      return render_template("result.html",results=jrs,serverUrl=serverUrl)
 
 #only support 1 image 1 face 
 @app.route("/detectBase64", methods=["POST"])
@@ -157,7 +193,7 @@ def detectBase64():
             return 
 
         file_size = Util.getFileSize(request.content_length,"MB")
-        if(file_size) > 5 :
+        if(file_size) > 100 :
             response = createJsonResponse(500,"the size of files is too big ({:.5f}MB)".format(file_size))
             return 
             

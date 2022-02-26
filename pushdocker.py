@@ -1,2 +1,2 @@
 import os
-os.system("docker push  containerappservicedennis.azurecr.io/pet-face-detect:0.1")
+os.system("docker push  ikouhaha888/pet-face-detect:0.1")

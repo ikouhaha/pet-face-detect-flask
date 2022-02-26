@@ -1,25 +1,36 @@
 <html>
-   <body>
-      <h1>Label Image</h1>
-      <div id="labelContainer">
-         {% for result in results %}
-         <img width="224"  src=data:image/png;base64,{{result.labelImg}}>
-         {% endfor %}
-      </div>
-      <h1>Cropped Image</h1>
-      <div id="CropContainer">
-         {% for result in results %}
-            {% for img in result.cropImgs %}
-               <img width="80"  src=data:image/png;base64,{{img}}>
-            {% endfor %}
-         {% endfor %}
-      </div>
 
-      <h1>Result</h1>
+<body>
+   <h1>Label Image</h1>
+   <div id="labelContainer">
       {% for result in results %}
-         <div>{{result.xyxy}}</div>
+      <img width="224" src=data:image/png;base64,{{result.labelImg}}>
       {% endfor %}
-      
+   </div>
+   <h1>Cropped Image</h1>
+   <div id="CropContainer">
+      {% for result in results %}
+      {% for img in result.cropImgs %}
+      <img width="80" src=data:image/png;base64,{{img}}>
+      {% endfor %}
+      {% endfor %}
+   </div>
 
-   </body>
+   <h1>Result</h1>
+   {% for result in results %}
+   <div>{{result.xyxys}}</div>
+   {% endfor %}
+
+
+   <form action="{{serverUrl}}/download" method="POST" enctype="application/json">
+         <input type="hidden" name="results" value="{{results}}"/>
+         <input type="submit" value="download"></input>
+      <br />
+
+   </form>
+
+
+
+</body>
+
 </html>

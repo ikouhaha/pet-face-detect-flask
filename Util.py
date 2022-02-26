@@ -33,12 +33,16 @@ def resize_img(im,img_size):
       value=[0, 0, 0])
   return new_im, ratio, top, left  
 
-def getBase64FromImage(img):
+def encodeBase64FromImage(img):
   buffered = io.BytesIO()
   img_array = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
   img_array.save(buffered, format="JPEG")
   img_str = base64.b64encode(buffered.getvalue())
   return img_str.decode("utf-8") 
+
+def decodeBase64ToImage(imgstring):
+  imgdata = base64.b64decode(imgstring)
+  return imgdata
 
 def readOriginalBB(xyxy,ratio,top,left):
   xmin = int((xyxy["xmin"]-left)/ratio)
