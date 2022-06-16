@@ -2,6 +2,16 @@ import cv2
 from PIL import Image
 import base64
 import io
+import matplotlib.pyplot as plt
+
+def imshow(img,text=None,should_save=False):
+    npimg = img.numpy()
+    plt.axis("off")
+    if text:
+        plt.text(75, 8, text, style='italic',fontweight='bold',
+            bbox={'facecolor':'white', 'alpha':0.8, 'pad':10})
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show() 
 
 def getServerUrl(host):
   schema = ""
@@ -45,10 +55,15 @@ def decodeBase64ToImage(imgstring):
   return imgdata
 
 def readOriginalBB(xyxy,ratio,top,left):
-  xmin = int((xyxy["xmin"]-left)/ratio)
-  xmax = int((xyxy["xmax"]-left)/ratio)
-  ymin = int((xyxy["ymin"]-top)/ratio)
-  ymax = int((xyxy["ymax"]-top)/ratio)
+  xmin = int(abs(xyxy["xmin"]-left)/ratio)
+  xmax = int(abs(xyxy["xmax"]-left)/ratio)
+  ymin = int(abs(xyxy["ymin"]-top)/ratio)
+  ymax = int(abs(xyxy["ymax"]-top)/ratio)
   return xmin,xmax,ymin,ymax
+
+
+
+
+
  
   

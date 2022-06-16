@@ -4,6 +4,8 @@ Run a rest API exposing the yolov5s object detection model
 
 
 
+import base64
+from distutils import extension
 from http.client import HTTPResponse
 import cv2
 import torch
@@ -12,18 +14,29 @@ from PIL import Image
 import json
 import io
 import numpy as np
+import os
 import urllib3
 import Util
 import zipfile
+from flask_cors import CORS
+from pathlib import Path
 
 
-global model 
-def init():
-    global model 
-    model = torch.hub.load('ultralytics_yolov5_master', 'custom', path='best.pt', source='local') # force_reload to recache
+
+from siamese.PetFinder import PetFinder
 
 
+global model,dataPath
+def init() :
+    global model,dataPath
+    # dataPath = "/app/data"
+    dataPath = "C:/Users/ikouh/Documents/fyp/data"
+    model = torch.hub.load('ultralytics_yolov5_master', 'custom', path=dataPath+'/best.pt', source='local') # force_reload to recache
+
+    # cat_folder = ShareServiceClient.from_connection_string(os.environ["file_store_string"],os.environ["share_name"],"cat")
+    # service_client.create_share()
 app = Flask(__name__)
+CORS(app) 
 
 init()
 
@@ -76,7 +89,8 @@ def detectImageResult(rImage,img_size):
             cropList.append(crop)
     
     for crop in cropList:
-        resizeCrop,ratio,top,left = Util.resize_img(crop,80)
+        
+        resizeCrop,ratio,top,left = Util.resize_img(crop,100)
         img_str = Util.encodeBase64FromImage(resizeCrop)
         cropStrList.append(img_str)
 
@@ -161,7 +175,7 @@ def downloadFile ():
 @app.route('/uploader', methods = ['GET', 'POST'])
 def upload_file():
       serverUrl = Util.getServerUrl(request.environ["HTTP_HOST"])
-      result = detectBase64()
+      result = detectBase64(1)
       j = result.json
       jrs = j["result"]
       errMsg = ""
@@ -174,9 +188,10 @@ def upload_file():
       return render_template("result.html",results=jrs,serverUrl=serverUrl)
 
 #only support 1 image 1 face 
-@app.route("/detectBase64", methods=["POST"])
-def detectBase64():
-    global model 
+@app.route("/detectBase64/<isSaveResult>", methods=["POST"])
+def detectBase64(isSaveResult):
+    isSaveResult = bool(int(isSaveResult))
+    global model,dataPath
     response = None
     data = {}
     img_size = 224 #resize to 224x224
@@ -196,7 +211,71 @@ def detectBase64():
         if(file_size) > 100 :
             response = createJsonResponse(500,"the size of files is too big ({:.5f}MB)".format(file_size))
             return 
+        
+        if(isSaveResult == True and request.form.__contains__("name")==False):
+            response = createJsonResponse(500,"no name")
+            return
+        else:
+            name = request.form["name"]
+            catPath = dataPath+"/cat/face/"+name 
+            dogPath = dataPath+"/dog/face/"+name 
+
+
+        if(request.files["image"]):
+            dataList = []
+            for requestFile in request.files.getlist("image"):
+                extension =  Path(requestFile.filename).suffix
+                data = detectImageResult(requestFile,img_size)
+                dataList.append(data)
+                if(isSaveResult==True):
+                    if(data["name"]=="cat"):
+                        path = catPath
+                    else:
+                        path = dogPath
+
+                    for crop in data["cropImgs"]:
+                        with open(path+extension, "wb") as fh:
+                            fh.write(base64.b64decode(crop))
+
+
+            #im0 = annotator.result()
+
+
             
+            response = createJsonResponse(200,dataList)
+        else:
+            response = createJsonResponse(500,"no image")
+            
+            
+    except Exception as e:
+       response = createJsonResponse(500,str(e))
+    finally:
+       return response
+
+@app.route("/detectByBase64", methods=["POST"])
+def detectByBase64():
+    global model 
+    response = None
+    data = {}
+    img_size = 224 #resize to 224x224
+    file_size = 0
+    
+    try:
+        if(model is None):
+            response = createJsonResponse(500,"no model")
+            return 
+            
+        model.eval()
+        if not request.method == "POST":
+            response = createJsonResponse(500,"only support POST method")
+            return 
+        
+        file_size = Util.getFileSize(request.content_length,"MB")
+        if(file_size) > 100 :
+            response = createJsonResponse(500,"the size of files is too big ({:.5f}MB)".format(file_size))
+            return 
+            
+        
         if(request.files["image"]):
             dataList = []
             for requestFile in request.files.getlist("image"):
@@ -204,6 +283,8 @@ def detectBase64():
                 dataList.append(data)
 
             #im0 = annotator.result()
+
+
             
             response = createJsonResponse(200,dataList)
         else:
@@ -215,10 +296,24 @@ def detectBase64():
     finally:
        return response
    
+@app.route("/findSimilarity", methods=["POST"])
+def findSimilarity():
+    try:
+        imageBase64 = request.json["imageBase64"]
+        type = request.json["type"]
+        if(imageBase64 is None or imageBase64==""):
+            response = createJsonResponse(500,"no image")
+        else:
+            #im0 = annotator.result()
+            results = PetFinder().find(dataPath+"/"+type,dataPath+"/{0}net.pt".format(type),imageBase64)   
+            response = createJsonResponse(200,results)   
+    except Exception as e:
+        response = createJsonResponse(500,str(e))
+    finally:
+        return response
 
 
 if __name__ == "__main__":
-    
     #parser = argparse.ArgumentParser(description="Flask API exposing YOLOv5 model")
     #parser.add_argument("--port", default=5000, type=int, help="port number")
     #model = torch.hub.load('ultralytics/yolov5','yolov5s')
