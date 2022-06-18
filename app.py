@@ -7,6 +7,7 @@ Run a rest API exposing the yolov5s object detection model
 import base64
 from distutils import extension
 from http.client import HTTPResponse
+from pydoc import Helper
 import cv2
 import torch
 from flask import Flask, request, make_response,render_template, send_file
@@ -30,7 +31,12 @@ global model,dataPath
 def init() :
     global model,dataPath
     # dataPath = "/app/data"
-    dataPath = "C:/Users/ikouh/Documents/fyp/data"
+    if(os.environ.__contains__("ENV")): #docker enviorment
+        dataPath = "/app/data"
+    else:
+        dataPath = "C:/Users/ikouh/Documents/fyp/data"
+    
+    
     model = torch.hub.load('ultralytics_yolov5_master', 'custom', path=dataPath+'/best.pt', source='local') # force_reload to recache
 
     # cat_folder = ShareServiceClient.from_connection_string(os.environ["file_store_string"],os.environ["share_name"],"cat")
@@ -252,50 +258,48 @@ def detectBase64(isSaveResult):
     finally:
        return response
 
-@app.route("/detectByBase64", methods=["POST"])
-def detectByBase64():
-    global model 
-    response = None
-    data = {}
-    img_size = 224 #resize to 224x224
-    file_size = 0
-    
+@app.route("/image", methods=["POST"])
+def saveImage():
     try:
-        if(model is None):
-            response = createJsonResponse(500,"no model")
-            return 
-            
-        model.eval()
-        if not request.method == "POST":
-            response = createJsonResponse(500,"only support POST method")
-            return 
-        
-        file_size = Util.getFileSize(request.content_length,"MB")
-        if(file_size) > 100 :
-            response = createJsonResponse(500,"the size of files is too big ({:.5f}MB)".format(file_size))
-            return 
-            
-        
-        if(request.files["image"]):
-            dataList = []
-            for requestFile in request.files.getlist("image"):
-                data = detectImageResult(requestFile,img_size)
-                dataList.append(data)
-
-            #im0 = annotator.result()
-
-
-            
-            response = createJsonResponse(200,dataList)
-        else:
+        imageBase64 = request.json["imageBase64"]
+        type = request.json["type"]
+        name = request.json["name"]
+        img = Util.decodeBase64ToImage(imageBase64)
+        if(imageBase64 is None or imageBase64==""):
             response = createJsonResponse(500,"no image")
-            
-            
+        elif(name is None or name==""):
+            response = createJsonResponse(500,"no name")
+        elif(type is None or type==""):
+            response = createJsonResponse(500,"no type")    
+        else:
+            #im0 = annotator.result()
+            with open(dataPath+"/{0}/face/{1}".format(type,name), "wb") as fh:
+                fh.write(img) 
+            response = createJsonResponse(200,"save image success")
     except Exception as e:
-       response = createJsonResponse(500,str(e))
+        response = createJsonResponse(500,str(e))
     finally:
-       return response
-   
+        return response
+
+@app.route("/image/<name>", methods=["DELETE"])
+def deleteImage(name):
+    try:
+        if(name is None or name==""):
+            response = createJsonResponse(500,"no name")
+        else:
+            #im0 = annotator.result()
+            catPath = dataPath+"/cat/face/"+name 
+            dogPath = dataPath+"/dog/face/"+name 
+            if os.path.isfile(catPath):
+                 os.remove(catPath)
+            if os.path.isfile(dogPath):
+                 os.remove(dogPath)
+            response = createJsonResponse(200,"delete image success")
+    except Exception as e:
+        response = createJsonResponse(500,str(e))
+    finally:
+        return response
+
 @app.route("/findSimilarity", methods=["POST"])
 def findSimilarity():
     try:
