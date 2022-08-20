@@ -221,10 +221,8 @@ def detectBase64(isSaveResult):
         if(isSaveResult == True and request.form.__contains__("name")==False):
             response = createJsonResponse(500,"no name")
             return
-        else:
-            name = request.form["name"]
-            catPath = dataPath+"/cat/face/"+name 
-            dogPath = dataPath+"/dog/face/"+name 
+      
+            
 
 
         if(request.files["image"]):
@@ -234,6 +232,9 @@ def detectBase64(isSaveResult):
                 data = detectImageResult(requestFile,img_size)
                 dataList.append(data)
                 if(isSaveResult==True):
+                    name = request.form["name"]
+                    catPath = dataPath+"/cat/face/"+name 
+                    dogPath = dataPath+"/dog/face/"+name 
                     if(data["name"]=="cat"):
                         path = catPath
                     else:
